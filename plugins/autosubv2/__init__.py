@@ -831,7 +831,12 @@ class AutoSubv2(_PluginBase):
     def __translate_to_zh(self, text: str, context: str = None) -> str:
         if self._event.is_set():
             raise UserInterruptException("用户中断当前任务")
-        return self._openai.translate_to_zh(text, context, max_retries=self._max_retries)
+        ret, result, usage = self._openai.translate_to_zh(text, context, max_retries=self._max_retries)
+        if ret and usage:
+            self._stats["token_prompt"] += usage["prompt_tokens"]
+            self._stats["token_completion"] += usage["completion_tokens"]
+            self._stats["token_total"] += usage["total_tokens"]
+        return ret, result
 
     def __process_batch(self, all_subs: list, batch: list) -> list:
         """批量处理逻辑"""
@@ -872,7 +877,8 @@ class AutoSubv2(_PluginBase):
             return item
 
     def __translate_zh_subtitle(self, source_lang: str, source_subtitle: str, dest_subtitle: str):
-        self._stats = {'total': 0, 'batch_success': 0, 'batch_fail': 0, 'line_fallback': 0}
+        self._stats = {'total': 0, 'batch_success': 0, 'batch_fail': 0, 'line_fallback': 0,
+                       'token_prompt': 0, 'token_completion': 0, 'token_total': 0}
         subs = self.__load_srt(source_subtitle)
         if source_lang in ["en", "eng"] and self._enable_merge:
             valid_subs = self.__merge_srt(subs)
@@ -904,13 +910,19 @@ class AutoSubv2(_PluginBase):
         self.__save_srt(dest_subtitle, processed)
         
         success_rate = (self._stats['batch_success'] / self._stats['total'] * 100) if self._stats['total'] > 0 else 0.0
-        
+        token_cost = ""
+        if self._stats['token_total'] > 0:
+            # DeepSeek 定价: prompt ¥1/1M tokens, completion ¥2/1M tokens
+            cost = (self._stats['token_prompt'] * 1 + self._stats['token_completion'] * 2) / 1_000_000
+            token_cost = f"""
+    💰 Token: prompt={self._stats['token_prompt']} completion={self._stats['token_completion']} total={self._stats['token_total']} (≈¥{cost:.4f})"""
+
         logger.info(f"""
     翻译完成！
     总处理条目: {self._stats['total']}
     批次成功: {self._stats['batch_success']} ({success_rate:.1f}%)
     批次失败: {self._stats['batch_fail']}
-    行补偿翻译: {self._stats['line_fallback']}
+    行补偿翻译: {self._stats['line_fallback']}{token_cost}
             """)
 
     @staticmethod

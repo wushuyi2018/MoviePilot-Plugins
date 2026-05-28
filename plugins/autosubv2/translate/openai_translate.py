@@ -121,6 +121,7 @@ class OpenAi:
         :param text: 输入文本
         :param context: 翻译上下文
         :param max_retries: 最大重试次数
+        :return: (success: bool, result: str, usage: dict|None)
         """
         system_prompt = """您是一位专业字幕翻译专家，请严格遵循以下规则：
 1. 将原文精准翻译为简体中文，保持原文本意
@@ -138,7 +139,18 @@ class OpenAi:
                                               temperature=0.2,
                                               top_p=0.9)
                 result = completion.choices[0].message.content.strip()
-                return True, result
+
+                # 记录 token 用量
+                usage_info = None
+                if hasattr(completion, 'usage') and completion.usage:
+                    usage = completion.usage
+                    usage_info = {
+                        "prompt_tokens": usage.prompt_tokens,
+                        "completion_tokens": usage.completion_tokens,
+                        "total_tokens": usage.total_tokens,
+                    }
+
+                return True, result, usage_info
             except Exception as e:
                 last_error = str(e)
                 if attempt < max_retries:
@@ -150,4 +162,4 @@ class OpenAi:
                     time.sleep(sleep_time)
                 else:
                     print(f"翻译请求失败 (已重试{max_retries}次)：{last_error}")
-                    return False, f"{last_error}"
+                    return False, f"{last_error}", None
