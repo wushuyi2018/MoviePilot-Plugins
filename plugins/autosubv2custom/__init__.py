@@ -24,8 +24,8 @@ from app.schemas.types import NotificationType, EventType
 from app.log import logger
 from app.plugins import _PluginBase
 from app.utils.system import SystemUtils
-from plugins.autosubv2.ffmpeg import Ffmpeg
-from plugins.autosubv2.translate.openai_translate import OpenAi
+from plugins.autosubv2custom.ffmpeg import Ffmpeg
+from plugins.autosubv2custom.translate.openai_translate import OpenAi
 
 
 class UserInterruptException(Exception):
@@ -58,21 +58,21 @@ class TaskItem:
 
 class AutoSubv2(_PluginBase):
     # 插件名称
-    plugin_name = "AI字幕自动生成(v2)"
+    plugin_name = "AI字幕自动生成(定制版)"
     # 插件描述
-    plugin_desc = "使用whisper自动生成视频文件字幕,使用大模型翻译字幕成中文。"
+    plugin_desc = "使用whisper自动生成视频文件字幕,使用大模型翻译字幕成中文。【定制版: 新增Token用量统计】"
     # 插件图标
     plugin_icon = "autosubtitles.jpeg"
     # 主题色
     plugin_color = "#2C4F7E"
     # 插件版本
-    plugin_version = "2.5.1"
+    plugin_version = "2.5.2"
     # 插件作者
-    plugin_author = "TimoYoung"
+    plugin_author = "TimoYoung (定制 by wushuyi2018)"
     # 作者主页
     author_url = "https://github.com/TimoYoung"
     # 插件配置项ID前缀
-    plugin_config_prefix = "autosubv2"
+    plugin_config_prefix = "autosubv2custom"
     # 加载顺序
     plugin_order = 14
     # 可使用的用户级别
@@ -1527,7 +1527,7 @@ class AutoSubv2(_PluginBase):
                                             {
                                                 'component': 'a',
                                                 'props': {
-                                                    'href': 'https://github.com/jxxghp/MoviePilot-Plugins/blob/main/plugins/autosubv2/README.md',
+                                                    'href': 'https://github.com/wushuyi2018/MoviePilot-Plugins/blob/main/plugins/autosubv2custom/README.md',
                                                     'target': '_blank'
                                                 },
                                                 'content': [
