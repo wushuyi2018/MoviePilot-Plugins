@@ -1077,11 +1077,12 @@
     "name": "字幕翻译",
     "description": "文件入库后自动提取字幕并使用LLM翻译为双语ASS字幕。自动检测HDR/SDR、支持Agent Loop自修正、上下文注入、反思翻译。",
     "labels": "字幕,翻译",
-    "version": "1.3",
+    "version": "1.4",
     "icon": "autosubtitles.jpeg",
     "author": "wushuyi2018",
     "level": 1,
     "history": {
+      "v1.4": "监听目录改为下拉选择(MP配置目录) + 修复VForm model:config + 补回get_api()",
       "v1.3": "重构配置: 自动检测HDR/SDR + 温度参数 + 翻译计数 + 删除字体/连通性测试",
       "v1.2": "添加 /test_translator 斜杠命令测试 API 连接",
       "v1.0": "全新插件: LLM Agent Loop翻译引擎 + 双语ASS输出 + 上下文注入"
