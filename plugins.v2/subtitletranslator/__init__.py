@@ -39,7 +39,7 @@ class SubtitleTranslator(_PluginBase):
     plugin_name: str = "字幕翻译"
     plugin_desc: str = "文件入库后自动提取字幕并使用 LLM 翻译为双语 ASS 字幕。"
     plugin_icon: str = "autosubtitles.jpeg"
-    plugin_version: str = "1.1"
+    plugin_version: str = "1.2"
     plugin_author: str = "wushuyi2018"
     author_url: str = "https://github.com/wushuyi2018"
     plugin_config_prefix: str = "subtitletranslator_"
@@ -353,46 +353,6 @@ class SubtitleTranslator(_PluginBase):
                                 },
                             ],
                         },
-                        {
-                            "component": "VRow",
-                            "content": [
-                                {
-                                    "component": "VCol",
-                                    "props": {"cols": 12, "md": 8},
-                                    "content": [
-                                        {
-                                            "component": "VBtn",
-                                            "props": {
-                                                "text": "🔗 测试连接 & 获取模型列表",
-                                                "variant": "outlined",
-                                                "color": "primary",
-                                                "block": True,
-                                                "loading": False,
-                                            },
-                                            "events": {
-                                                "onclick": "test_connection"
-                                            },
-                                        }
-                                    ],
-                                },
-                                {
-                                    "component": "VCol",
-                                    "props": {"cols": 12, "md": 4},
-                                    "content": [
-                                        {
-                                            "component": "VTextField",
-                                            "props": {
-                                                "model": "model",
-                                                "label": "模型名称",
-                                                "placeholder": "deepseek-v4-flash",
-                                                "hint": "点击左侧按钮自动填充",
-                                                "persistent_hint": True,
-                                            },
-                                        }
-                                    ],
-                                },
-                            ],
-                        },
                     ],
                 }
             ],
@@ -414,7 +374,53 @@ class SubtitleTranslator(_PluginBase):
             },
         )
 
+    # ---------- 远程命令 ----------
+
+    @staticmethod
+    def get_command() -> List[Dict[str, Any]]:
+        """注册远程命令"""
+        return [
+            {
+                "cmd": "/test_translator",
+                "event": EventType.PluginAction,
+                "desc": "测试 API 连接 & 获取模型列表",
+                "category": "字幕翻译",
+                "data": {"action": "test_connection"}
+            }
+        ]
+
     # ---------- 事件处理 ----------
+
+    @eventmanager.register(EventType.PluginAction)
+    def on_plugin_action(self, event: Event):
+        """
+        处理远程命令
+
+        :param event: 事件对象 (event.data 包含 action)
+        """
+        action = (event.data or {}).get("action", "")
+        if action != "test_connection":
+            return
+
+        # 执行连接测试
+        result = self.test_connection()
+
+        if result.get("success"):
+            models = result.get("models", [])[:10]
+            model_list = "\n".join(f"• `{m}`" for m in models)
+            self.post_message(
+                title="✅ API 连接成功",
+                text=(
+                    f"地址：{self._api_base}\n"
+                    f"可用模型 ({result.get('count', 0)} 个)：\n"
+                    f"{model_list}"
+                ),
+            )
+        else:
+            self.post_message(
+                title="❌ API 连接失败",
+                text=f"地址：{self._api_base}\n错误：{result.get('error', '未知')}",
+            )
 
     @eventmanager.register(EventType.TransferComplete)
     def on_transfer_complete(self, event: Event):
