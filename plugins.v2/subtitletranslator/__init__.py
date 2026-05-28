@@ -121,6 +121,7 @@ class SubtitleTranslator(_PluginBase):
             [
                 {
                     "component": "VForm",
+                    "props": {"model": "config"},
                     "content": [
                         {
                             "component": "VRow",
