@@ -353,6 +353,46 @@ class SubtitleTranslator(_PluginBase):
                                 },
                             ],
                         },
+                        {
+                            "component": "VRow",
+                            "content": [
+                                {
+                                    "component": "VCol",
+                                    "props": {"cols": 12, "md": 8},
+                                    "content": [
+                                        {
+                                            "component": "VBtn",
+                                            "props": {
+                                                "text": "🔗 测试连接 & 获取模型列表",
+                                                "variant": "outlined",
+                                                "color": "primary",
+                                                "block": True,
+                                                "loading": False,
+                                            },
+                                            "events": {
+                                                "onclick": "test_connection"
+                                            },
+                                        }
+                                    ],
+                                },
+                                {
+                                    "component": "VCol",
+                                    "props": {"cols": 12, "md": 4},
+                                    "content": [
+                                        {
+                                            "component": "VTextField",
+                                            "props": {
+                                                "model": "model",
+                                                "label": "模型名称",
+                                                "placeholder": "deepseek-v4-flash",
+                                                "hint": "点击左侧按钮自动填充",
+                                                "persistent_hint": True,
+                                            },
+                                        }
+                                    ],
+                                },
+                            ],
+                        },
                     ],
                 }
             ],
@@ -525,7 +565,57 @@ class SubtitleTranslator(_PluginBase):
 
     def get_api(self) -> List[Dict[str, Any]]:
         """注册插件 API"""
-        return []
+        return [
+            {
+                "path": "/test_connection",
+                "endpoint": self.test_connection,
+                "methods": ["POST"],
+                "auth": "apikey",
+                "summary": "测试连接 & 获取模型列表",
+                "description": "使用当前配置的 API 地址和 Key 测试连接并获取可用模型列表。"
+            }
+        ]
+
+    def test_connection(self, api_base: str = "", api_key: str = ""):
+        """
+        测试 API 连接并获取模型列表
+
+        :param api_base: API 地址 (留空使用已保存的配置)
+        :param api_key: API Key (留空使用已保存的配置)
+        :return: {"success": bool, "models": [...], "error": str}
+        """
+        base = api_base or self._api_base
+        key = api_key or self._api_key
+
+        if not base or not key:
+            return {"success": False, "error": "请先填写 API 地址和 API Key 并保存配置。"}
+
+        try:
+            tr, _, _ = _lazy_import()
+            from openai import OpenAI
+            client = OpenAI(base_url=base, api_key=key)
+            models = client.models.list()
+            model_ids = sorted([m.id for m in models.data])
+
+            logger.info(
+                f"[SubtitleTranslator] 连接测试成功: {base} "
+                f"({len(model_ids)} 个模型)"
+            )
+
+            return {
+                "success": True,
+                "models": model_ids,
+                "count": len(model_ids),
+                "message": f"连接成功! 找到 {len(model_ids)} 个可用模型。"
+            }
+        except Exception as e:
+            logger.error(f"[SubtitleTranslator] 连接测试失败: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "models": [],
+                "message": f"连接失败: {str(e)[:100]}"
+            }
 
     def get_page(self) -> Optional[List[dict]]:
         """插件详情页"""
