@@ -39,7 +39,7 @@ class SubtitleTranslator(_PluginBase):
     plugin_name: str = "字幕翻译"
     plugin_desc: str = "文件入库后自动提取字幕并使用 LLM 翻译为双语 ASS 字幕。"
     plugin_icon: str = "autosubtitles.jpeg"
-    plugin_version: str = "1.2"
+    plugin_version: str = "1.3"
     plugin_author: str = "wushuyi2018"
     author_url: str = "https://github.com/wushuyi2018"
     plugin_config_prefix: str = "subtitletranslator_"
@@ -55,11 +55,8 @@ class SubtitleTranslator(_PluginBase):
     _batch_size: int = 10
     _context_window: int = 3
     _reflect_mode: bool = False
-    _video_style: str = "sdr"
-    _target_font: str = "文泉驿微米黑"
-    _target_size: int = 20
-    _source_font: str = "微软雅黑"
-    _source_size: int = 15
+    _temperature: float = 0.3
+    _translated_count: int = 0  # 累计翻译字幕数
     _notify: bool = True
 
     _translator: Optional[Any] = None
@@ -81,11 +78,7 @@ class SubtitleTranslator(_PluginBase):
             self._batch_size = int(config.get("batch_size", 10))
             self._context_window = int(config.get("context_window", 3))
             self._reflect_mode = config.get("reflect_mode", False)
-            self._video_style = config.get("video_style", "sdr")
-            self._target_font = config.get("target_font", "文泉驿微米黑")
-            self._target_size = int(config.get("target_size", 20))
-            self._source_font = config.get("source_font", "微软雅黑")
-            self._source_size = int(config.get("source_size", 15))
+            self._temperature = float(config.get("temperature", 0.3))
             self._notify = config.get("notify", True)
 
         # 初始化翻译引擎 (懒加载依赖)
@@ -99,6 +92,7 @@ class SubtitleTranslator(_PluginBase):
                     batch_size=self._batch_size,
                     context_window=self._context_window,
                     reflect_mode=self._reflect_mode,
+                    temperature=self._temperature,
                 )
                 logger.info(
                     f"[SubtitleTranslator] 翻译引擎已启动: "
@@ -123,11 +117,6 @@ class SubtitleTranslator(_PluginBase):
 
     @staticmethod
     def get_form() -> Tuple[Optional[List[dict]], Dict[str, Any]]:
-        """
-        插件配置页面 (Vuetify JSON 模式)
-
-        :return: (页面配置, 默认数据)
-        """
         return (
             [
                 {
@@ -215,7 +204,7 @@ class SubtitleTranslator(_PluginBase):
                             "content": [
                                 {
                                     "component": "VCol",
-                                    "props": {"cols": 12, "md": 4},
+                                    "props": {"cols": 12, "md": 3},
                                     "content": [
                                         {
                                             "component": "VTextField",
@@ -229,7 +218,22 @@ class SubtitleTranslator(_PluginBase):
                                 },
                                 {
                                     "component": "VCol",
-                                    "props": {"cols": 12, "md": 4},
+                                    "props": {"cols": 12, "md": 3},
+                                    "content": [
+                                        {
+                                            "component": "VTextField",
+                                            "props": {
+                                                "model": "temperature",
+                                                "label": "温度参数",
+                                                "type": "number",
+                                                "placeholder": "0.3",
+                                            },
+                                        }
+                                    ],
+                                },
+                                {
+                                    "component": "VCol",
+                                    "props": {"cols": 12, "md": 3},
                                     "content": [
                                         {
                                             "component": "VTextField",
@@ -243,109 +247,13 @@ class SubtitleTranslator(_PluginBase):
                                 },
                                 {
                                     "component": "VCol",
-                                    "props": {"cols": 12, "md": 4},
-                                    "content": [
-                                        {
-                                            "component": "VSelect",
-                                            "props": {
-                                                "model": "video_style",
-                                                "label": "字幕样式",
-                                                "items": [
-                                                    {"title": "SDR 视频", "value": "sdr"},
-                                                    {"title": "HDR 16:9", "value": "hdr_16_9"},
-                                                    {"title": "HDR 21:9", "value": "hdr_21_9"},
-                                                ],
-                                            },
-                                        }
-                                    ],
-                                },
-                            ],
-                        },
-                        {
-                            "component": "VRow",
-                            "content": [
-                                {
-                                    "component": "VCol",
-                                    "props": {"cols": 12, "md": 4},
+                                    "props": {"cols": 12, "md": 3},
                                     "content": [
                                         {
                                             "component": "VTextField",
                                             "props": {
                                                 "model": "batch_size",
                                                 "label": "每批句数",
-                                                "type": "number",
-                                            },
-                                        }
-                                    ],
-                                },
-                                {
-                                    "component": "VCol",
-                                    "props": {"cols": 12, "md": 4},
-                                    "content": [
-                                        {
-                                            "component": "VTextField",
-                                            "props": {
-                                                "model": "context_window",
-                                                "label": "上下文窗口 (前后各N句)",
-                                                "type": "number",
-                                            },
-                                        }
-                                    ],
-                                },
-                                {
-                                    "component": "VCol",
-                                    "props": {"cols": 12, "md": 4},
-                                    "content": [
-                                        {
-                                            "component": "VTextField",
-                                            "props": {
-                                                "model": "target_font",
-                                                "label": "译文字体",
-                                            },
-                                        }
-                                    ],
-                                },
-                            ],
-                        },
-                        {
-                            "component": "VRow",
-                            "content": [
-                                {
-                                    "component": "VCol",
-                                    "props": {"cols": 12, "md": 3},
-                                    "content": [
-                                        {
-                                            "component": "VTextField",
-                                            "props": {
-                                                "model": "target_size",
-                                                "label": "译文字号",
-                                                "type": "number",
-                                            },
-                                        }
-                                    ],
-                                },
-                                {
-                                    "component": "VCol",
-                                    "props": {"cols": 12, "md": 3},
-                                    "content": [
-                                        {
-                                            "component": "VTextField",
-                                            "props": {
-                                                "model": "source_font",
-                                                "label": "原文字体",
-                                            },
-                                        }
-                                    ],
-                                },
-                                {
-                                    "component": "VCol",
-                                    "props": {"cols": 12, "md": 3},
-                                    "content": [
-                                        {
-                                            "component": "VTextField",
-                                            "props": {
-                                                "model": "source_size",
-                                                "label": "原文字号",
                                                 "type": "number",
                                             },
                                         }
@@ -361,66 +269,16 @@ class SubtitleTranslator(_PluginBase):
                 "api_base": "https://api.deepseek.com/v1",
                 "api_key": "",
                 "model": "deepseek-v4-flash",
+                "temperature": 0.3,
                 "watch_dir": "",
                 "batch_size": 10,
                 "context_window": 3,
                 "reflect_mode": False,
-                "video_style": "sdr",
-                "target_font": "文泉驿微米黑",
-                "target_size": 20,
-                "source_font": "微软雅黑",
-                "source_size": 15,
                 "notify": True,
             },
         )
 
-    # ---------- 远程命令 ----------
-
-    @staticmethod
-    def get_command() -> List[Dict[str, Any]]:
-        """注册远程命令"""
-        return [
-            {
-                "cmd": "/test_translator",
-                "event": EventType.PluginAction,
-                "desc": "测试 API 连接 & 获取模型列表",
-                "category": "字幕翻译",
-                "data": {"action": "test_connection"}
-            }
-        ]
-
     # ---------- 事件处理 ----------
-
-    @eventmanager.register(EventType.PluginAction)
-    def on_plugin_action(self, event: Event):
-        """
-        处理远程命令
-
-        :param event: 事件对象 (event.data 包含 action)
-        """
-        action = (event.data or {}).get("action", "")
-        if action != "test_connection":
-            return
-
-        # 执行连接测试
-        result = self.test_connection()
-
-        if result.get("success"):
-            models = result.get("models", [])[:10]
-            model_list = "\n".join(f"• `{m}`" for m in models)
-            self.post_message(
-                title="✅ API 连接成功",
-                text=(
-                    f"地址：{self._api_base}\n"
-                    f"可用模型 ({result.get('count', 0)} 个)：\n"
-                    f"{model_list}"
-                ),
-            )
-        else:
-            self.post_message(
-                title="❌ API 连接失败",
-                text=f"地址：{self._api_base}\n错误：{result.get('error', '未知')}",
-            )
 
     @eventmanager.register(EventType.TransferComplete)
     def on_transfer_complete(self, event: Event):
@@ -492,18 +350,16 @@ class SubtitleTranslator(_PluginBase):
                 )
             return
 
-        # 5. 写入输出 (双语 ASS)
+        # 5. 检测 HDR + 写入双语 ASS
         try:
-            style_config = {
-                "video_style": self._video_style,
-                "model": self._model,
-                "target_font": self._target_font,
-                "target_size": self._target_size,
-                "source_font": self._source_font,
-                "source_size": self._source_size,
-            }
             _, su, _ = _lazy_import()
-            su.write_ass_bilingual(output_path, subs, translated, style_config)
+            is_hdr = su.detect_hdr(file_path)
+            su.write_ass_bilingual(
+                output_path, subs, translated,
+                is_hdr=is_hdr,
+                model=self._model,
+            )
+            self._translated_count += len(subs)
         except Exception as e:
             logger.error(f"[SubtitleTranslator] 写入文件失败: {file_name} - {e}")
             return
@@ -569,60 +425,6 @@ class SubtitleTranslator(_PluginBase):
         base = os.path.splitext(video_path)[0]
         return f"{base}.chs.ass"
 
-    def get_api(self) -> List[Dict[str, Any]]:
-        """注册插件 API"""
-        return [
-            {
-                "path": "/test_connection",
-                "endpoint": self.test_connection,
-                "methods": ["POST"],
-                "auth": "apikey",
-                "summary": "测试连接 & 获取模型列表",
-                "description": "使用当前配置的 API 地址和 Key 测试连接并获取可用模型列表。"
-            }
-        ]
-
-    def test_connection(self, api_base: str = "", api_key: str = ""):
-        """
-        测试 API 连接并获取模型列表
-
-        :param api_base: API 地址 (留空使用已保存的配置)
-        :param api_key: API Key (留空使用已保存的配置)
-        :return: {"success": bool, "models": [...], "error": str}
-        """
-        base = api_base or self._api_base
-        key = api_key or self._api_key
-
-        if not base or not key:
-            return {"success": False, "error": "请先填写 API 地址和 API Key 并保存配置。"}
-
-        try:
-            tr, _, _ = _lazy_import()
-            from openai import OpenAI
-            client = OpenAI(base_url=base, api_key=key)
-            models = client.models.list()
-            model_ids = sorted([m.id for m in models.data])
-
-            logger.info(
-                f"[SubtitleTranslator] 连接测试成功: {base} "
-                f"({len(model_ids)} 个模型)"
-            )
-
-            return {
-                "success": True,
-                "models": model_ids,
-                "count": len(model_ids),
-                "message": f"连接成功! 找到 {len(model_ids)} 个可用模型。"
-            }
-        except Exception as e:
-            logger.error(f"[SubtitleTranslator] 连接测试失败: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "models": [],
-                "message": f"连接失败: {str(e)[:100]}"
-            }
-
     def get_page(self) -> Optional[List[dict]]:
         """插件详情页"""
         if not self._translator:
@@ -645,7 +447,27 @@ class SubtitleTranslator(_PluginBase):
                 "content": [
                     {
                         "component": "VCol",
-                        "props": {"cols": 12, "md": 6},
+                        "props": {"cols": 12, "md": 4},
+                        "content": [
+                            {
+                                "component": "VCard",
+                                "props": {"title": "翻译统计"},
+                                "content": [
+                                    {
+                                        "component": "VCardText",
+                                        "props": {
+                                            "text": (
+                                                f"已翻译字幕数：{self._translated_count:,}"
+                                            ),
+                                        },
+                                    }
+                                ],
+                            }
+                        ],
+                    },
+                    {
+                        "component": "VCol",
+                        "props": {"cols": 12, "md": 4},
                         "content": [
                             {
                                 "component": "VCard",
@@ -668,7 +490,7 @@ class SubtitleTranslator(_PluginBase):
                     },
                     {
                         "component": "VCol",
-                        "props": {"cols": 12, "md": 6},
+                        "props": {"cols": 12, "md": 4},
                         "content": [
                             {
                                 "component": "VCard",

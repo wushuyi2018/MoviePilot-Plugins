@@ -28,15 +28,52 @@ ASS_STYLES = {
         "Style: Default,文泉驿微米黑,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,"
         "-1,0,0,0,93,100,0,0,1,3,0.6,2,10,10,10,1"
     ),
-    "hdr_16_9": (
+    "hdr": (
         "Style: Default,文泉驿微米黑,20,&H009E9E9E,&H000000FF,&H00000000,&H00000000,"
         "-1,0,0,0,95,100,0,0,1,0.6,0.2,2,10,10,10,1"
     ),
-    "hdr_21_9": (
-        "Style: Default,文泉驿微米黑,21,&H009E9E9E,&H000000FF,&H00000000,&H00000000,"
-        "-1,0,0,0,93,100,0,0,1,2,0.5,2,10,10,5,1"
-    ),
 }
+
+
+def detect_hdr(video_path: str) -> bool:
+    """
+    检测视频是否为 HDR (通过色彩传递函数)
+
+    :param video_path: 视频文件路径
+    :return: True = HDR, False = SDR (或无法检测时默认 SDR)
+    """
+    try:
+        probe_cmd = [
+            "ffprobe", "-v", "quiet", "-print_format", "json",
+            "-show_streams", "-select_streams", "v:0", video_path,
+        ]
+        result = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode != 0:
+            return False
+
+        streams = json_lib.loads(result.stdout).get("streams", [])
+        if not streams:
+            return False
+
+        video_stream = streams[0]
+        # HDR 特征: 色彩传递函数为 smpte2084 (PQ) 或 arib-std-b67 (HLG)
+        transfer = video_stream.get("color_transfer", "")
+        color_primaries = video_stream.get("color_primaries", "")
+        bits = video_stream.get("bits_per_raw_sample", 8)
+
+        is_hdr = (
+            transfer in ("smpte2084", "arib-std-b67")
+            or int(bits) >= 10
+            or color_primaries in ("bt2020",)
+        )
+        logger.debug(
+            f"[SubtitleUtils] 视频检测: transfer={transfer}, "
+            f"primaries={color_primaries}, bits={bits}, hdr={is_hdr}"
+        )
+        return is_hdr
+    except Exception as e:
+        logger.warning(f"[SubtitleUtils] HDR 检测失败, 默认 SDR: {e}")
+        return False
 
 
 def find_external_subtitles(video_path: str) -> Optional[str]:
@@ -143,7 +180,8 @@ def write_ass_bilingual(
     output_path: str,
     originals: List[Dict],
     translated: Dict[int, str],
-    config: Dict,
+    is_hdr: bool = False,
+    model: str = "LLM",
 ):
     r"""
     写入双语 ASS 字幕文件
@@ -155,21 +193,17 @@ def write_ass_bilingual(
     :param output_path: 输出文件路径
     :param originals: 原始字幕 [{"start", "end", "text"}, ...]
     :param translated: 翻译结果 {index: "译文", ...}
-    :param config: 样式配置 {video_style, model, target_font, target_size, source_font, source_size}
+    :param is_hdr: 是否 HDR 视频 (自动选择样式)
+    :param model: 翻译模型名称 (用于标注行)
     """
-    video_style = config.get("video_style", "sdr")
-    model = config.get("model", "LLM")
-    target_font = config.get("target_font", "文泉驿微米黑")
-    target_size = config.get("target_size", 20)
-    source_font = config.get("source_font", "微软雅黑")
-    source_size = config.get("source_size", 15)
+    video_style = "hdr" if is_hdr else "sdr"
 
     # 译文样式 (内联覆盖)
     target_style = (
-        f"{{\\fn{target_font}\\fs{target_size}\\b1\\bord0.8}}"
+        "{\\fn文泉驿微米黑\\fs20\\b1\\bord0.8}"
     )
     source_style = (
-        f"{{\\fn{source_font}\\fs{source_size}\\b0}}"
+        "{\\fn微软雅黑\\fs15\\b0}"
     )
 
     lines = []

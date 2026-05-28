@@ -41,7 +41,7 @@ class TranslatorEngine:
     """
 
     MAX_STEPS = 3          # Agent loop 最大重试次数
-    TEMPERATURE = 0.3      # 翻译最佳温度
+    DEFAULT_TEMPERATURE = 0.3  # 翻译默认温度
     REQUEST_INTERVAL = 0.5 # 请求间隔 (秒)
     MAX_RETRIES = 3        # HTTP 重试次数
     RETRY_DELAY = 3.0      # HTTP 重试间隔 (秒)
@@ -54,6 +54,7 @@ class TranslatorEngine:
         batch_size: int = 10,
         context_window: int = 3,
         reflect_mode: bool = False,
+        temperature: float = 0.3,
     ):
         """
         初始化翻译引擎
@@ -64,6 +65,7 @@ class TranslatorEngine:
         :param batch_size: 每批翻译句数
         :param context_window: 上下文窗口大小 (前后各 N 句)
         :param reflect_mode: 是否启用反思翻译
+        :param temperature: LLM 温度参数
         """
         self.client = None
         if OPENAI_AVAILABLE:
@@ -74,6 +76,7 @@ class TranslatorEngine:
         self.batch_size = batch_size
         self.context_window = context_window
         self.reflect_mode = reflect_mode
+        self._temperature = temperature
 
         # Token 统计
         self.total_prompt_tokens = 0
@@ -356,7 +359,7 @@ class TranslatorEngine:
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=messages,
-                    temperature=self.TEMPERATURE,
+                    temperature=self._temperature,
                 )
                 self._record_usage(response)
                 return response.choices[0].message.content
