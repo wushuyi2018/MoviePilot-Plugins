@@ -426,6 +426,10 @@ class SubtitleTranslator(_PluginBase):
         base = os.path.splitext(video_path)[0]
         return f"{base}.chs.ass"
 
+    def get_api(self) -> List[Dict[str, Any]]:
+        """插件 API (v1.3 简化版 — 仅保留必要接口)"""
+        return []
+
     def get_page(self) -> Optional[List[dict]]:
         """插件详情页"""
         if not self._translator:
