@@ -5,13 +5,19 @@
   - ai-trans.py: 双语 ASS 格式、样式标签剥离
   - 修复换行123.py: SRT→ASS 转换、编码检测、三套 HDR/SDR 预设
 """
+import json as json_lib
 import logging
 import os
 import re
 import subprocess
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
-import pysrt
+# 懒加载 pysrt (MP 环境可能未安装)
+try:
+    import pysrt
+    PYSRT_AVAILABLE = True
+except ImportError:
+    PYSRT_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +91,6 @@ def extract_embedded_subtitle(video_path: str) -> Optional[str]:
         if result.returncode != 0:
             return None
 
-        import json as json_lib
         streams = json_lib.loads(result.stdout).get("streams", [])
         if not streams:
             return None

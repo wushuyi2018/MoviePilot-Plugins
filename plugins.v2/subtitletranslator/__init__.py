@@ -16,14 +16,20 @@ from app.log import logger
 from app.plugins import _PluginBase
 from app.schemas.types import EventType
 
-from .subtitle_utils import (
-    find_external_subtitles,
-    extract_embedded_subtitle,
-    parse_srt,
-    write_ass_bilingual,
-)
-from .translator import TranslatorEngine
-from .prompt import STANDARD_PROMPT, REFLECT_PROMPT
+# 懒加载——避免 openai/pysrt 未安装时整个插件崩溃
+_translator = None
+_subtitle_utils = None
+_prompt = None
+
+
+def _lazy_import():
+    """延迟导入依赖模块 (需要 openai + pysrt)"""
+    global _translator, _subtitle_utils, _prompt
+    if _translator is None:
+        from . import translator as _translator
+        from . import subtitle_utils as _subtitle_utils
+        from . import prompt as _prompt
+    return _translator, _subtitle_utils, _prompt
 
 
 class SubtitleTranslator(_PluginBase):
@@ -56,7 +62,7 @@ class SubtitleTranslator(_PluginBase):
     _source_size: int = 15
     _notify: bool = True
 
-    _translator: Optional[TranslatorEngine] = None
+    _translator: Optional[Any] = None
 
     # ---------- 生命周期 ----------
 
@@ -82,21 +88,26 @@ class SubtitleTranslator(_PluginBase):
             self._source_size = int(config.get("source_size", 15))
             self._notify = config.get("notify", True)
 
-        # 初始化翻译引擎
+        # 初始化翻译引擎 (懒加载依赖)
         if self._enabled and self._api_key:
-            self._translator = TranslatorEngine(
-                api_base=self._api_base,
-                api_key=self._api_key,
-                model=self._model,
-                batch_size=self._batch_size,
-                context_window=self._context_window,
-                reflect_mode=self._reflect_mode,
-            )
-            logger.info(
-                f"[SubtitleTranslator] 翻译引擎已启动: "
-                f"model={self._model}, batch={self._batch_size}, "
-                f"context={self._context_window}, reflect={self._reflect_mode}"
-            )
+            try:
+                tr, _, _ = _lazy_import()
+                self._translator = tr.TranslatorEngine(
+                    api_base=self._api_base,
+                    api_key=self._api_key,
+                    model=self._model,
+                    batch_size=self._batch_size,
+                    context_window=self._context_window,
+                    reflect_mode=self._reflect_mode,
+                )
+                logger.info(
+                    f"[SubtitleTranslator] 翻译引擎已启动: "
+                    f"model={self._model}, batch={self._batch_size}, "
+                    f"context={self._context_window}, reflect={self._reflect_mode}"
+                )
+            except Exception as e:
+                logger.error(f"[SubtitleTranslator] 初始化失败: {e}")
+                self._translator = None
 
     def get_state(self) -> bool:
         """获取插件运行状态"""
@@ -414,7 +425,8 @@ class SubtitleTranslator(_PluginBase):
 
         # 3. 解析字幕
         try:
-            subs = parse_srt(subtitle_source)
+            _, su, _ = _lazy_import()
+            subs = su.parse_srt(subtitle_source)
         except Exception as e:
             logger.error(f"[SubtitleTranslator] 解析字幕失败: {file_name} - {e}")
             return
@@ -444,7 +456,8 @@ class SubtitleTranslator(_PluginBase):
                 "source_font": self._source_font,
                 "source_size": self._source_size,
             }
-            write_ass_bilingual(output_path, subs, translated, style_config)
+            _, su, _ = _lazy_import()
+            su.write_ass_bilingual(output_path, subs, translated, style_config)
         except Exception as e:
             logger.error(f"[SubtitleTranslator] 写入文件失败: {file_name} - {e}")
             return
@@ -485,14 +498,15 @@ class SubtitleTranslator(_PluginBase):
         :return: 字幕文件路径 或 None
         """
         # 优先使用同目录外挂字幕
-        external = find_external_subtitles(video_path)
+        _, su, _ = _lazy_import()
+        external = su.find_external_subtitles(video_path)
         if external:
             logger.info(f"[SubtitleTranslator] 使用外挂字幕: {os.path.basename(external)}")
             return external
 
         # 尝试从视频中提取内嵌字幕
         logger.info(f"[SubtitleTranslator] 未找到外挂字幕，尝试提取内嵌字幕")
-        extracted = extract_embedded_subtitle(video_path)
+        extracted = su.extract_embedded_subtitle(video_path)
         if extracted:
             logger.info(f"[SubtitleTranslator] 已提取内嵌字幕: {os.path.basename(extracted)}")
             return extracted

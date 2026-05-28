@@ -9,11 +9,16 @@
 import json
 import logging
 import time
-from typing import Any, Callable, Dict, List, Optional
-
-from openai import OpenAI
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from .prompt import STANDARD_PROMPT, REFLECT_PROMPT
+
+# 懒加载 openai (MP 环境可能未安装)
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +65,11 @@ class TranslatorEngine:
         :param context_window: 上下文窗口大小 (前后各 N 句)
         :param reflect_mode: 是否启用反思翻译
         """
-        self.client = OpenAI(base_url=api_base, api_key=api_key)
+        self.client = None
+        if OPENAI_AVAILABLE:
+            self.client = OpenAI(base_url=api_base, api_key=api_key)
+        else:
+            logger.warning("[Translator] openai 未安装，翻译功能不可用")
         self.model = model
         self.batch_size = batch_size
         self.context_window = context_window
