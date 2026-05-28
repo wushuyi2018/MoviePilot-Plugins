@@ -56,7 +56,7 @@ class TaskItem:
     complete_time: datetime = None
 
 
-class AutoSubv2(_PluginBase):
+class AutoSubv2Custom(_PluginBase):
     # 插件名称
     plugin_name = "AI字幕自动生成(定制版)"
     # 插件描述
