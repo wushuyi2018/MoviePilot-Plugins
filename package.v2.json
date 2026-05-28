@@ -1072,5 +1072,17 @@
       "v1.0.2": "修复UI界面显示不全及前端路由报错问题",
       "v1.0.1": "新增 Agent Tokens 配额管理、供应商优先级切换和用量展示"
     }
+  },
+  "SubtitleTranslator": {
+    "name": "字幕翻译",
+    "description": "文件入库后自动提取字幕并使用LLM翻译为双语ASS字幕。支持Agent Loop自修正、上下文注入、反思翻译、多套HDR/SDR字幕样式。",
+    "labels": "字幕,翻译",
+    "version": "1.0",
+    "icon": "autosubtitles.jpeg",
+    "author": "wushuyi2018",
+    "level": 1,
+    "history": {
+      "v1.0": "全新插件: LLM Agent Loop翻译引擎 + 双语ASS输出 + 上下文注入"
+    }
   }
 }
