@@ -58,6 +58,8 @@ class TaskItem:
     token_prompt: int = 0
     token_completion: int = 0
     token_total: int = 0
+    token_cache_hit: int = 0
+    token_cache_miss: int = 0
 
 
 class AutoSubv2Custom(_PluginBase):
@@ -70,7 +72,7 @@ class AutoSubv2Custom(_PluginBase):
     # 主题色
     plugin_color = "#2C4F7E"
     # 插件版本
-    plugin_version = "2.5.3"
+    plugin_version = "2.5.4"
     # 插件作者
     plugin_author = "TimoYoung (定制 by wushuyi2018)"
     # 作者主页
@@ -208,6 +210,8 @@ class AutoSubv2Custom(_PluginBase):
                     token_prompt=task_dict.get("token_prompt", 0),
                     token_completion=task_dict.get("token_completion", 0),
                     token_total=task_dict.get("token_total", 0),
+                    token_cache_hit=task_dict.get("token_cache_hit", 0),
+                    token_cache_miss=task_dict.get("token_cache_miss", 0),
                 )
                 tasks[task_id] = task
             except Exception as e:
@@ -226,6 +230,8 @@ class AutoSubv2Custom(_PluginBase):
             "token_prompt": task.token_prompt,
             "token_completion": task.token_completion,
             "token_total": task.token_total,
+            "token_cache_hit": task.token_cache_hit,
+            "token_cache_miss": task.token_cache_miss,
         }
 
     def save_tasks(self):
@@ -290,6 +296,8 @@ class AutoSubv2Custom(_PluginBase):
                     task.token_prompt = self._stats.get("token_prompt", 0)
                     task.token_completion = self._stats.get("token_completion", 0)
                     task.token_total = self._stats.get("token_total", 0)
+                    task.token_cache_hit = self._stats.get("token_cache_hit", 0)
+                    task.token_cache_miss = self._stats.get("token_cache_miss", 0)
                 self._tasks[task.task_id] = task
                 self.save_tasks()
                 self._task_queue.task_done()
@@ -851,6 +859,8 @@ class AutoSubv2Custom(_PluginBase):
             self._stats["token_prompt"] += usage["prompt_tokens"]
             self._stats["token_completion"] += usage["completion_tokens"]
             self._stats["token_total"] += usage["total_tokens"]
+            self._stats["token_cache_hit"] += usage.get("prompt_cache_hit_tokens", 0)
+            self._stats["token_cache_miss"] += usage.get("prompt_cache_miss_tokens", usage["prompt_tokens"])
         return ret, result
 
     def __process_batch(self, all_subs: list, batch: list) -> list:
@@ -893,7 +903,8 @@ class AutoSubv2Custom(_PluginBase):
 
     def __translate_zh_subtitle(self, source_lang: str, source_subtitle: str, dest_subtitle: str):
         self._stats = {'total': 0, 'batch_success': 0, 'batch_fail': 0, 'line_fallback': 0,
-                       'token_prompt': 0, 'token_completion': 0, 'token_total': 0}
+                       'token_prompt': 0, 'token_completion': 0, 'token_total': 0,
+                       'token_cache_hit': 0, 'token_cache_miss': 0}
         subs = self.__load_srt(source_subtitle)
         if source_lang in ["en", "eng"] and self._enable_merge:
             valid_subs = self.__merge_srt(subs)
@@ -927,10 +938,13 @@ class AutoSubv2Custom(_PluginBase):
         success_rate = (self._stats['batch_success'] / self._stats['total'] * 100) if self._stats['total'] > 0 else 0.0
         token_cost = ""
         if self._stats['token_total'] > 0:
-            # DeepSeek 定价: prompt ¥1/1M tokens, completion ¥2/1M tokens
-            cost = (self._stats['token_prompt'] * 1 + self._stats['token_completion'] * 2) / 1_000_000
+            # DeepSeek 定价: 缓存命中 ¥0.02/1M, 未命中 ¥1/1M, 输出 ¥2/1M
+            cost = (self._stats['token_cache_hit'] * 0.02 +
+                    self._stats['token_cache_miss'] * 1 +
+                    self._stats['token_completion'] * 2) / 1_000_000
+            hit_info = f" 命中={self._stats['token_cache_hit']} 未命中={self._stats['token_cache_miss']}" if self._stats['token_cache_hit'] > 0 else ""
             token_cost = f"""
-    💰 Token: prompt={self._stats['token_prompt']} completion={self._stats['token_completion']} total={self._stats['token_total']} (≈¥{cost:.4f})"""
+    💰 Token: prompt={self._stats['token_prompt']}{hit_info} completion={self._stats['token_completion']} total={self._stats['token_total']} (¥{cost:.4f})"""
 
         logger.info(f"""
     翻译完成！
@@ -1647,7 +1661,7 @@ class AutoSubv2Custom(_PluginBase):
                     # Token 用量（定制版新增）
                     {
                         "component": "td",
-                        "text": f"{task.token_total:,} (≈¥{(task.token_prompt * 1 + task.token_completion * 2) / 1_000_000:.4f})"
+                        "text": f"{task.token_total:,} (¥{(task.token_cache_hit * 0.02 + task.token_cache_miss * 1 + task.token_completion * 2) / 1_000_000:.4f})"
                         if task.token_total > 0 else "-"
                     },
                 ],

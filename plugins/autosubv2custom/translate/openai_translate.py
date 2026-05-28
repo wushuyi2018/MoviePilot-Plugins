@@ -148,6 +148,9 @@ class OpenAi:
                         "prompt_tokens": usage.prompt_tokens,
                         "completion_tokens": usage.completion_tokens,
                         "total_tokens": usage.total_tokens,
+                        # DeepSeek 缓存命中/未命中（定制版新增）
+                        "prompt_cache_hit_tokens": getattr(usage, 'prompt_cache_hit_tokens', 0),
+                        "prompt_cache_miss_tokens": getattr(usage, 'prompt_cache_miss_tokens', usage.prompt_tokens),
                     }
 
                 return True, result, usage_info
