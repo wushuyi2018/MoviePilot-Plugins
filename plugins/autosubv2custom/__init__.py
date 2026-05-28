@@ -54,6 +54,10 @@ class TaskItem:
     add_time: datetime
     status: TaskStatus = TaskStatus.PENDING
     complete_time: datetime = None
+    # Token 用量统计（定制版新增）
+    token_prompt: int = 0
+    token_completion: int = 0
+    token_total: int = 0
 
 
 class AutoSubv2Custom(_PluginBase):
@@ -66,7 +70,7 @@ class AutoSubv2Custom(_PluginBase):
     # 主题色
     plugin_color = "#2C4F7E"
     # 插件版本
-    plugin_version = "2.5.2"
+    plugin_version = "2.5.3"
     # 插件作者
     plugin_author = "TimoYoung (定制 by wushuyi2018)"
     # 作者主页
@@ -201,6 +205,9 @@ class AutoSubv2Custom(_PluginBase):
                     status=TaskStatus(task_dict["status"]),
                     complete_time=datetime.fromisoformat(task_dict["complete_time"])
                     if task_dict.get("complete_time") else None,
+                    token_prompt=task_dict.get("token_prompt", 0),
+                    token_completion=task_dict.get("token_completion", 0),
+                    token_total=task_dict.get("token_total", 0),
                 )
                 tasks[task_id] = task
             except Exception as e:
@@ -216,6 +223,9 @@ class AutoSubv2Custom(_PluginBase):
             "add_time": task.add_time.isoformat() if task.add_time else None,
             "status": task.status.value,
             "complete_time": task.complete_time.isoformat() if task.complete_time else None,
+            "token_prompt": task.token_prompt,
+            "token_completion": task.token_completion,
+            "token_total": task.token_total,
         }
 
     def save_tasks(self):
@@ -275,6 +285,11 @@ class AutoSubv2Custom(_PluginBase):
                 self.save_tasks()
                 task.status = self.__process_autosub(task.video_file)
                 task.complete_time = datetime.now()
+                # 保存 token 用量（定制版新增）
+                if task.status == TaskStatus.COMPLETED and hasattr(self, '_stats'):
+                    task.token_prompt = self._stats.get("token_prompt", 0)
+                    task.token_completion = self._stats.get("token_completion", 0)
+                    task.token_total = self._stats.get("token_total", 0)
                 self._tasks[task.task_id] = task
                 self.save_tasks()
                 self._task_queue.task_done()
@@ -1629,6 +1644,12 @@ class AutoSubv2Custom(_PluginBase):
                         "props": {"class": status_class},
                         "text": status_text
                     },
+                    # Token 用量（定制版新增）
+                    {
+                        "component": "td",
+                        "text": f"{task.token_total:,} (≈¥{(task.token_prompt * 1 + task.token_completion * 2) / 1_000_000:.4f})"
+                        if task.token_total > 0 else "-"
+                    },
                 ],
             })
 
@@ -1671,6 +1692,12 @@ class AutoSubv2Custom(_PluginBase):
                                                 "component": "th",
                                                 "props": {"class": "text-start ps-4"},
                                                 "text": "状态"
+                                            },
+                                            # Token 用量（定制版新增）
+                                            {
+                                                "component": "th",
+                                                "props": {"class": "text-start ps-4"},
+                                                "text": "Token / 费用"
                                             },
                                         ]
                                     },

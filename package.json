@@ -26,7 +26,7 @@
     "name": "AI字幕自动生成(定制版)",
     "description": "使用whisper自动生成视频文件字幕,使用大模型翻译字幕成中文。【定制版: 新增Token用量统计】",
     "labels": "字幕",
-    "version": "2.5.2",
+    "version": "2.5.3",
     "icon": "autosubtitles.jpeg",
     "author": "TimoYoung (定制 by wushuyi2018)",
     "level": 1,
