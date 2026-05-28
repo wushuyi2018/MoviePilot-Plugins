@@ -39,7 +39,7 @@ class SubtitleTranslator(_PluginBase):
     plugin_name: str = "字幕翻译"
     plugin_desc: str = "文件入库后自动提取字幕并使用 LLM 翻译为双语 ASS 字幕。"
     plugin_icon: str = "autosubtitles.jpeg"
-    plugin_version: str = "1.0"
+    plugin_version: str = "1.1"
     plugin_author: str = "wushuyi2018"
     author_url: str = "https://github.com/wushuyi2018"
     plugin_config_prefix: str = "subtitletranslator_"
