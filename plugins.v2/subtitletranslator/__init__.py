@@ -237,11 +237,24 @@ class SubtitleTranslator(_PluginBase):
                                     "props": {"cols": 12, "md": 3},
                                     "content": [
                                         {
-                                            "component": "VTextField",
+                                            "component": "VSelect",
                                             "props": {
                                                 "model": "watch_dir",
-                                                "label": "监听目录名",
-                                                "placeholder": "待翻译",
+                                                "label": "监听目录",
+                                                "placeholder": "选择要翻译的目录",
+                                                "items": [
+                                                    {"title": "电影", "value": "电影"},
+                                                    {"title": "英美剧", "value": "英美剧"},
+                                                    {"title": "日韩剧", "value": "日韩剧"},
+                                                    {"title": "港台剧", "value": "港台剧"},
+                                                    {"title": "日番", "value": "日番"},
+                                                    {"title": "日漫", "value": "日漫"},
+                                                    {"title": "国漫", "value": "国漫"},
+                                                    {"title": "订阅电影", "value": "订阅电影"},
+                                                    {"title": "纪录片", "value": "纪录片"},
+                                                    {"title": "综艺", "value": "综艺"},
+                                                    {"title": "(全部目录)", "value": ""},
+                                                ],
                                             },
                                         }
                                     ],
