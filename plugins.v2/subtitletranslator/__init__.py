@@ -11,6 +11,8 @@ import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
+from app.core.event import eventmanager, Event
+from app.log import logger
 from app.plugins import _PluginBase
 from app.schemas.types import EventType
 
@@ -23,15 +25,18 @@ from .subtitle_utils import (
 from .translator import TranslatorEngine
 from .prompt import STANDARD_PROMPT, REFLECT_PROMPT
 
-logger = logging.getLogger(__name__)
-
 
 class SubtitleTranslator(_PluginBase):
     """字幕翻译插件：文件入库后自动翻译字幕"""
 
+    # 插件元信息（官方规范）
     plugin_name: str = "字幕翻译"
     plugin_desc: str = "文件入库后自动提取字幕并使用 LLM 翻译为双语 ASS 字幕。"
+    plugin_icon: str = "autosubtitles.jpeg"
     plugin_version: str = "1.0"
+    plugin_author: str = "wushuyi2018"
+    author_url: str = "https://github.com/wushuyi2018"
+    plugin_config_prefix: str = "subtitletranslator_"
     plugin_order: int = 20
     auth_level: int = 1
 
@@ -360,13 +365,8 @@ class SubtitleTranslator(_PluginBase):
 
     # ---------- 事件处理 ----------
 
-    @property
-    def eventmanager(self):
-        """事件管理器（从 _PluginBase 继承后通过 property 透出）"""
-        return self._eventmanager
-
-    @_PluginBase.eventmanager.register(EventType.TransferComplete)
-    def on_transfer_complete(self, event):
+    @eventmanager.register(EventType.TransferComplete)
+    def on_transfer_complete(self, event: Event):
         """
         文件整理完成事件处理
 
